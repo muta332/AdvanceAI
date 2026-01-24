@@ -24,5 +24,7 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-		
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void ProjectileAttack(const FProjectileInfo& AttackInfo);
+	
 };

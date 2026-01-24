@@ -2,6 +2,7 @@
 
 
 #include "Systems/AttackSystem/AttackSystem.h"
+#include "AdvanceAI/Public/BlueprintFunctionLibrary/GunBlueprintFunctionLibrary.h"
 
 // Sets default values for this component's properties
 UAttackSystem::UAttackSystem()
@@ -30,5 +31,9 @@ void UAttackSystem::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	// ...
+}
+
+void UAttackSystem::ProjectileAttack_Implementation(const FProjectileInfo& AttackInfo)
+{
 }
 

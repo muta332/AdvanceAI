@@ -10,11 +10,40 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "AdvanceAI/Macros.h"
+#include "BlueprintFunctionLibrary/LatentLibrary.h"
+#include "Systems/GunSystem/GGunSystem.h"
+#include "Systems/HealhtAndDamageSystem/GHealthAndDamageSystem.h"
+#include "Widget/InteractionWidget/GInteractionWidget.h"
+#include "Widget/MainWidget/GMainWidget.h"
+
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 //////////////////////////////////////////////////////////////////////////
 // AAdvanceAICharacter
+
+void ABasePlayerCharacter::OnDamageResponse_Implementation(EDamageResponse DamageResponse, AActor* DamageCauser,
+	EDamageType DamageType)
+{
+	Super::OnDamageResponse_Implementation(DamageResponse, DamageCauser, DamageType);
+	
+	if (PlayerHud && HealthAndDamageSystem)
+	{
+		
+		PlayerHud->SetHealthBar(HealthAndDamageSystem->Health/HealthAndDamageSystem->MaxHealth);
+	}
+}
+
+void ABasePlayerCharacter::OnDeath_Implementation()
+{
+	Super::OnDeath_Implementation();
+	if (PlayerHud && InteractionWidget)
+	{
+		PlayerHud->RemoveFromViewport();
+		InteractionWidget->RemoveFromParent();
+	}
+}
 
 ABasePlayerCharacter::ABasePlayerCharacter()
 {
@@ -57,11 +86,34 @@ ABasePlayerCharacter::ABasePlayerCharacter()
 //////////////////////////////////////////////////////////////////////////
 // Input
 
+void ABasePlayerCharacter::PlayMovementAnimation_Implementation(bool StartMontage, int32 ForwardDirection,
+	int32 RightDirection)
+{
+}
+
 void ABasePlayerCharacter::MoveEnd(const FInputActionValue& Value)
 {
 	
 	PlayMovementAnimation(false, 0, 0);
 	AnimPlaying = false;
+}
+
+void ABasePlayerCharacter::DebugFunction()
+{
+  FGameplayTag Tag = FGameplayTag::RequestGameplayTag("FiringMode.Single");
+	
+	
+}
+
+void ABasePlayerCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+	
+}
+
+void ABasePlayerCharacter::SecondDebugFunction()
+{
+	DON_RESET(NCounter)
 }
 
 void ABasePlayerCharacter::NotifyControllerChanged()
@@ -93,6 +145,7 @@ void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ABasePlayerCharacter::Look);
+		
 	}
 	else
 	{
@@ -105,6 +158,61 @@ void ABasePlayerCharacter::Jump()
 	Super::Jump();
 	
 }
+
+void ABasePlayerCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (CVarGameplayTag.GetValueOnGameThread())
+	{
+		PRINTONE(ActiveGameplayTagContainer.ToString())
+		
+	}
+}
+
+void ABasePlayerCharacter::GunTrigger_Implementation()
+{
+	Super::GunTrigger_Implementation();
+	if (Weapon && Weapon->GunSystem)
+	{
+		Weapon->GunSystem->Triggered();
+	}
+}
+
+void ABasePlayerCharacter::GunTriggerEnd_Implementation()
+{
+	Super::GunTriggerEnd_Implementation();
+	if (Weapon && Weapon->GunSystem)
+	{
+		Weapon->GunSystem->TriggerReleased();
+	}
+}
+
+void ABasePlayerCharacter::Reloading_Implementation()
+{
+	Super::Reloading_Implementation();
+	if (Weapon && Weapon->GunSystem)
+	{
+		Weapon->GunSystem->Reloading();
+	}
+}
+
+void ABasePlayerCharacter::SwitchGunMode_Implementation()
+{
+	Super::SwitchGunMode_Implementation();
+	if (Weapon && Weapon->GunSystem)
+	{
+		Weapon->GunSystem->SwitchFiringModleCycle();
+	}
+}
+
+void ABasePlayerCharacter::SetSpeed(float Speed)
+{
+	
+	
+		GetCharacterMovement()->MaxWalkSpeed = Speed;
+	
+}
+
 
 void ABasePlayerCharacter::Move(const FInputActionValue& Value)
 {
@@ -150,9 +258,7 @@ void ABasePlayerCharacter::Look(const FInputActionValue& Value)
 	}
 }
 
-void ABasePlayerCharacter::PlayMovementAnimation_Implementation(bool StartMontage, int32 ForwardDirection, int32 RightDirection)
-{
-}
+
 
 
 

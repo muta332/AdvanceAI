@@ -8,7 +8,7 @@
 #include "GamePlayTagInterFaces.generated.h"
 
 // This class does not need to be modified.
-UINTERFACE(MinimalAPI)
+UINTERFACE(MinimalAPI, BlueprintType)
 class UGamePlayTagInterFaces : public UInterface
 {
 	GENERATED_BODY()
@@ -27,10 +27,10 @@ public:
 	FGameplayTagContainer GetActiveGamePlayTagContainer();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void AddTag(const FGameplayTag& AddTag );
+	void AddTag(const FGameplayTag AddTag );
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void RemoveTag	(const FGameplayTag& RemoveTag );
+	void RemoveTag	(const FGameplayTag RemoveTag );
 
 	
 };

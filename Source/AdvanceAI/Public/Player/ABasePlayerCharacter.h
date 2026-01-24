@@ -13,7 +13,9 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
-
+class UGInteractionWidget;
+class UGMainWidget;
+static TAutoConsoleVariable<bool> CVarGameplayTag(TEXT("su.ShowGamePlayTag"), false, TEXT("if true, every tick ,all the tags of container will be printedOnScree"), ECVF_Cheat);
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS(config=Game)
@@ -45,12 +47,38 @@ class ABasePlayerCharacter : public AGCharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Widget")
+	UGInteractionWidget* InteractionWidget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Widget")
+	UGMainWidget* PlayerHud;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player")
+	FVector NormalThirdPersonCamera;
+	
+	void OnDamageResponse_Implementation(EDamageResponse DamageResponse, AActor* DamageCauser, EDamageType DamageType) override;
+
+	void OnDeath_Implementation() override;
+
+	
+   
+
+
+
+	
 public:
 	ABasePlayerCharacter();
+	
 	
 
 protected:
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector RunCameraOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector CrouchCameraZoomLocation;
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
@@ -63,10 +91,21 @@ protected:
 	UFUNCTION()
 	void MoveEnd(const FInputActionValue& Value);
 
+	UFUNCTION(BlueprintCallable)
+	void DebugFunction();
+
+	void BeginPlay()override;
+
+	UFUNCTION(BlueprintCallable)
+	void SecondDebugFunction();
+
 	bool AnimPlaying = false;
 
+	int32 NCounter = 0;
+
 	
-			
+
+	
 
 protected:
 
@@ -81,5 +120,18 @@ public:
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
 	void Jump() override;
+protected:
+    void Tick(float DeltaTime) override;
+
+	void GunTrigger_Implementation() override;
+
+	void GunTriggerEnd_Implementation() override;
+	
+	void Reloading_Implementation() override;
+
+	void SwitchGunMode_Implementation() override;
+private:
+	UFUNCTION(Exec)
+	void SetSpeed(float Speed = 10000);
 };
 

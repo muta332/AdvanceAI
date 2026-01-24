@@ -7,120 +7,184 @@
 #include "BlueprintFunctionLibrary/GunBlueprintFunctionLibrary.h"
 #include "AdvanceAI/Public/InterFaces/GamePlayTagInterFaces.h"
 #include "GGunSystem.generated.h"
-
+class  UDA_GunSystem;
 class UAttackSystem;
+class UParticleSystem;
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FUpdateCurrentStorage, int32, CurrentStorage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFireStarted);
-
-
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFireEnded);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnReloadFinished, const int32&, Ammo, const int32&, StorageAmmo);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateMag, const int32&, Ammo);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FUpdateNewCurrentStorage, int32, CurrentStorage);
+static TAutoConsoleVariable<bool> CVarGunSystem (TEXT("su.system.Gun"), false,TEXT("if true, will show information of currenty equiped weapon"));
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnReloadFinished, int32, Ammo, int32, StorageAmmo);
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateAmmo, int32, Ammo);
-
-
-UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable )
 class ADVANCEAI_API UGGunSystem : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
+public:
+	//Delegates
+	UPROPERTY(BlueprintAssignable)
+	FUpdateCurrentStorage UpdateCurrentStorage;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Ammo")
-	int32 Ammo;
+	UPROPERTY(BlueprintAssignable)
+	FOnFireStarted OnFireStarted;
+	
+	UPROPERTY(BlueprintAssignable)
+	FOnFireEnded OnFireEnded;
+	
+	UPROPERTY(BlueprintAssignable)
+	FOnReloadFinished OnReloadFinished;
+	UPROPERTY(BlueprintAssignable)
+	FOnUpdateMag OnUpdateMag;
+	
+	UPROPERTY(BlueprintAssignable)
+	FUpdateNewCurrentStorage UpdateNewCurrentStorage;
+	
+	//Skeletal Mesh component of the gun
+	UPROPERTY(BlueprintReadWrite, Category = "Components")
+	USkeletalMeshComponent* GunSkeletalMesh;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Ammo")
-	int32 MaxAmmo;
+	//Current bullets in Magazine
+	UPROPERTY(BlueprintReadWrite, Category = "Ammo", VisibleInstanceOnly)
+	int32 AmmoInMag;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Ammo")
-	int32 AmmoStorage;
+	//Current bullets in Magazine
+	UPROPERTY(BlueprintReadWrite, Category = "Ammo", VisibleInstanceOnly)
+	int32 MagCapacity;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Ammo")
+	//Remaining Ammo In Inventory
+	UPROPERTY(BlueprintReadWrite, Category = "Ammo", VisibleInstanceOnly)
+	int32 CurrentStorage;
+
+	//Max Ammo, Character Allowed to Carry
+	UPROPERTY(BlueprintReadWrite, Category = "Ammo", VisibleInstanceOnly)
 	int32 MaxAmmoStorage;
 
+	//Max Distance where the End of Trace is
 	UPROPERTY(BlueprintReadWrite)
 	float TraceLength;
 
-	UPROPERTY(BlueprintReadWrite)
+	//Fire Rate of the gunj. 1/60 = 60 shots per second
+	UPROPERTY(BlueprintReadWrite, VisibleInstanceOnly)
 	float FireRate;
 
+	//The Playable Character or AI
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<ACharacter> AsCharacter;
 
+	//How many shots per tirgger for brust fire Only
 	UPROPERTY(BlueprintReadWrite)
 	int32 BrustCount;
 
-	UPROPERTY(BlueprintReadWrite)
-	bool bIsAI;
 
+
+	//Information of how damage is inflicted
 	UPROPERTY(BlueprintReadWrite)
 	FDamageInfo DamageInfo;
 
+	//Name of the Bone where bullets discharage
 	UPROPERTY(BlueprintReadWrite)
 	FName ProjectileMuzzleName;
 
 	UPROPERTY(BlueprintReadWrite)
 	FTimerHandle AttackTimer;
 
-	UPROPERTY(BlueprintReadWrite)
+	//Info of spawned bullet to reach its destination
+	UPROPERTY(BlueprintReadWrite, VisibleInstanceOnly)
 	FProjectileInfo BulletSpawnData;
 
-	UPROPERTY(BlueprintReadWrite)
+	//Attack Montage Related Information
+	UPROPERTY(BlueprintReadWrite, VisibleInstanceOnly)
 	FMontage AttackMontage;
 
+
+	//Information for Reload Anim Montage
 	UPROPERTY(BlueprintReadWrite)
 	FMontage ReloadMontage;
 
-	UPROPERTY(BlueprintReadOnly)
-	FOnFireStarted OnFireStarted;
-
-	UPROPERTY(BlueprintReadOnly)
-	FOnFireEnded OnFireEnded;
-
-	UPROPERTY(BlueprintReadOnly)
-	FOnReloadFinished OnReloadEnded;
-
-	UPROPERTY(BlueprintReadOnly)
-	FOnUpdateAmmo OnUpdateAmmo;
+	UPROPERTY(BlueprintReadWrite, Category = "Character")
+	AActor* OwnerCharacter;
+	
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool IsCharacterAI = false;
 	
 protected:
+	//Counter For Advance Flip Flop goes more than one
 	UPROPERTY(BlueprintReadWrite, Category = "Ammo")
-	int32 LoopCounterForRiflingMode;
-	
+	int32 SwitchCounter;
+
+	//Max Number for Advance flip flop
 	UPROPERTY(BlueprintReadWrite, Category = "Ammo")
-	int32 MaxLoopCounterForRiflingMode;
+	int32 MaxSwitchCounter;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Tag")
-	FGameplayTag CameraZoomTag;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Tag")
+	FGameplayTag CameraZoomTag = FGameplayTag::RequestGameplayTag("Camera.ZoomIn");
 
+	//Used to clear the loop function which executes Attack function
 	UPROPERTY(BlueprintReadWrite, Category = "Timer")
 	FTimerHandle AttackTimerHandle;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Tag")
-	FGameplayTag ShootingStatus;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Tag")
+	FGameplayTag ShootingStatus = FGameplayTag::RequestGameplayTag("Status.Shooting");
 
-	UPROPERTY(BlueprintReadWrite, Category = "Tag")
-	FGameplayTag FiringModeTag;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Tag")
+	FGameplayTag FiringModeTag = FGameplayTag::RequestGameplayTag("FiringMode");
 
+	//BPC Attack System Actor Component
 	UPROPERTY(BlueprintReadWrite, Category = "Component")
 	UAttackSystem* AttackSystem;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Tag")
-	FGameplayTag FiringModeAuto;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Tag")
+	FGameplayTag FiringModeAuto = FGameplayTag::RequestGameplayTag("FiringMode.Auto");
 
-	UPROPERTY(BlueprintReadWrite, Category = "Tag")
-	FGameplayTag FiringModeBrust;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Tag")
+	FGameplayTag FiringModeBrust = FGameplayTag::RequestGameplayTag("FiringMode.Brust");
 
-	UPROPERTY(BlueprintReadWrite, Category = "Tag")
-	FGameplayTag FiringModeSingle;
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Tag")
+	FGameplayTag FiringModeSingle = FGameplayTag::RequestGameplayTag("FiringMode.Single");
+	
+	UPROPERTY(BlueprintReadWrite, Category = "Sound", VisibleInstanceOnly)
+	USoundBase* GunShotSound;
+
+	//Scales the spawned priticle in gun Muzzle
+	UPROPERTY(BlueprintReadWrite)
+	float MuzzleEmitterSclae;
+
+	UPROPERTY(BlueprintReadWrite)
+	UParticleSystem* MuzzleParticleSystem;
+
+	//Data asset for Guns that sets all the critical variables for a gun to function in this class
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = "Data Asset")
+	 UDA_GunSystem* GunAsset;
+
+	//Class of the Guns Bullet/Projectile
+	UPROPERTY(BlueprintReadOnly, Category = "Ammo")
+	TSubclassOf<AActor> ProjectileClass;
+
+	//Amount used In a Full Mag. Max-Current in a mag
+	UPROPERTY(BlueprintReadWrite, Category = "Ammo")
+	float UsedBullets;
+
 	
 
 	
 
 	
 
+private:
+	int32 BrustFireCounter = 0;
 
-public:	
+	bool bDoOnceFlag = false;
+	
+	
+
+	
+
+
+public:
+	//For Player Usage
 	UGGunSystem();
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
@@ -130,17 +194,20 @@ public:
 	virtual void TriggerReleased();
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	virtual void SwitchFiringMode();
+	virtual void SwitchFiringModleCycle();
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void Reloading();
+
+	UFUNCTION(BlueprintCallable, Category = "DataAsset")
+	virtual void SetUpVarFromDataAsset();
 
 	
 
 	
 
 protected:
-	
+	//For Componet Usage
 	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
@@ -149,6 +216,21 @@ protected:
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void Attack();
+
+	UFUNCTION(BlueprintCallable, Category = "GunSystem")
+	void SwitchAutoMode();
+
+	UFUNCTION(BlueprintCallable, Category = "GunSystem")
+	void SwitchSingleMode();
+
+	UFUNCTION(BlueprintCallable, Category = "GunSystem")
+	void SwitchBrustMode();
+
+	void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	
+
+
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void AttackAmmoCalculation();
@@ -160,23 +242,35 @@ protected:
 	virtual void AttackAssistantFunction();
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	virtual void AmmoUpdate();
+	virtual void UpdateMag();
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void SwitchMode();
-	void Shoot();
+	
+
+	
+
+	
+	UFUNCTION(BlueprintCallable, Category = "GunSystem")
+	virtual void OnReloadAmmoUpdate();
 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	virtual void ModeAutoFunction();
+	virtual void SetAmmoStorage(int32 Amount);
 
-	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	virtual void ModeBurstFunction();
+	UFUNCTION()
+	virtual void TriggerReleaseFunction();
 
-	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	virtual void ModeSingleFunction();
+	void BrustFireFunction();
 
-	void  DoN(int32 N);
+	void SingleFireFunction();
 
+	void Fire();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	void GetUsedAmmoAmountInStorage(int32& ReturnValue);
+	
+
+	
 	
 
 	

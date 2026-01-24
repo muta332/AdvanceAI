@@ -1,22 +1,31 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "DrawDebugHelpers.h"
 
-#define DO_ONCE (_bool_)\
-	{(!flag)   {flag = true  ;        \
-     
-#define DO_ONCE_END }
+#define DOONCE(Flag)\
+	if(Flag == false)\
+	{Flag = true
 
-#define DO_N(N, Counter)\
-	\
-	if(!Counter > N)\
-	{\
-	Counter++;\
-	
+#define DOONCE_END }
+
+#define DOONCE_RESET(Flag)\
+	Flag = false;
+
+#define DON(Counter, N)\
+if ( Counter != N ||  Counter < N){\
+	 Counter++;
 
 #define DON_END }
 
-#define PRINT(Key, TimeToDisplay, FColor, DebugString){if(GEngine) {GEngine->AddOnScreenDebugMessage(Key, TimeToDisplay, FColor, DebugString);}}
+#define DON_RESET(Counter) Counter = 0;
 
-#define PRINTONE(DebugString){if(GEngine) {GEngine->AddOnScreenDebugMessage(1, 5.f, FColor::Red, DebugString);}}
+#define PRINTONE(DebugMsg) if(GEngine){GEngine->AddOnScreenDebugMessage(1, 2.f, FColor::Green,DebugMsg);}
 
+#define PRINT(Key, TimeToDisplay, FColor, DebugMsg) if(GEngine)  {GEngine->AddOnScreenDebugMessage(Key, TimeToDisplay, FColor,DebugMsg);}
+
+#define PRINTPERFRAME(DebugMsg) if(GEngine){GEngine->AddOnScreenDebugMessage(1, 0, FColor::Green,DebugMsg);}
+
+#define DRAWDEBUGSPHERE(CenterLocationVector)DrawDebugSphere(this->GetWorld(), CenterLocationVector ,40.f, 12, FColor::Green, false, 2.f);
+
+#define DRAWDEBUGSPHERECUSTOM(UWorld, CenterVector, Radius, Segments, Color, PresistentLines, LifeTime)

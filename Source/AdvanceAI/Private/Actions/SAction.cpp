@@ -8,7 +8,11 @@ UWorld* USAction::GetWorld() const
 	UActorComponent* comp = Cast<UActorComponent>(GetOuter());
 	if (comp)
 	{
-		return comp->GetOwner()->GetWorld();
+		return GetOuter()->GetWorld();
 	}
+	
+		
+		
+	
 	return nullptr;
 }
