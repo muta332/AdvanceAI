@@ -92,7 +92,7 @@ void UGGunSystem::Reloading()
 			IGCharacterInterface::Execute_PlayAnimation(OwnerCharacter, ReloadMontage);
 		}
 	}
-	else if (CurrentStorage < 0 || CurrentStorage > 0)
+	else if (CurrentStorage < 0 || CurrentStorage == 0)
 	{
 	   IGamePlayTagInterFaces::Execute_AddTag(OwnerCharacter,FGameplayTag::RequestGameplayTag("Gun.StorageEmty"));
 	}
