@@ -18,6 +18,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnUpdateMag, const int32&, Ammo);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FUpdateNewCurrentStorage, int32, CurrentStorage);
 static TAutoConsoleVariable<bool> CVarGunSystem (TEXT("su.system.Gun"), false,TEXT("if true, will show information of currenty equiped weapon"));
 
+UENUM(BlueprintType)
+enum class EFiringMode: uint8
+{
+	EFM_Single UMETA(DisplayName = "Single"),
+	EFM_Auto UMETA(DisplayName = "Auto"),
+	EFM_Burst UMETA(DisplayName = "Burst")
+};
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable )
 class ADVANCEAI_API UGGunSystem : public UActorComponent
 {
@@ -168,6 +176,8 @@ protected:
 	float UsedBullets;
 
 	
+	EFiringMode FiringMode = EFiringMode::EFM_Single;
+	
 
 	
 
@@ -176,7 +186,7 @@ protected:
 private:
 	int32 BrustFireCounter = 0;
 
-	bool bDoOnceFlag = false;
+	bool bHasFiredThisTrigger = false;
 	
 	
 
@@ -184,88 +194,115 @@ private:
 
 
 public:
-	//For Player Usage
+	//For Player and AI Usage
 	UGGunSystem();
 
+	//Call to pull Trigger
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void Triggered();
 
+	//Call to stop pulling the trigger
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void TriggerReleased();
 
-	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	virtual void SwitchFiringModleCycle();
-
+	
+    //call to reload
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void Reloading();
 
+	//call to setup component variables from DataAsset
 	UFUNCTION(BlueprintCallable, Category = "DataAsset")
 	virtual void SetUpVarFromDataAsset();
+	
+	//call to Switch gun mode between Auto, Single and burst mode. 
+	UFUNCTION(BlueprintCallable, Category = "GunSystem")
+	virtual void SwitchFiringModeCycle();
 
 	
 
 	
 
 protected:
-	//For Componet Usage
+	//For Componet Usage. Not Callable Directly for Players or AI. All of these functions are internal usage only
+	
+	//Call to Switch Mode of the gun
+	UFUNCTION(BlueprintCallable, Category = "GunSystem")
+	virtual void SwitchMode();
+	
+	
+	
 	virtual void BeginPlay() override;
 
+	//Called by TriggerReleased to reset the Trigger
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void ResetAttack();
 	void SwitchOnFiringMode(const FGameplayTag& Tag);
 
+	//called by Trigger. Loops every FireRate Interval 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void Attack();
 
+	//Call to manually set the gun to auto mode instead of cycling to Auto mode
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	void SwitchAutoMode();
 
+	//Call to manually set the gun to Single mode instead of cycling to Single mode
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	void SwitchSingleMode();
 
+	//Call to manually set the gun to Burst mode instead of cycling to Burst mode
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	void SwitchBrustMode();
+	void SwitchBurstMode();
 
+	//Ticks EveryFrams
 	void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	
 
 
-
+//Not Used
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void AttackAmmoCalculation();
 
+	//Not used 
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual FProjectileInfo CameraAim();
 
+	//Calls to initiate the projectile Spawn data, calls the update mag function and does necessary trace for AI and player to spawn bullet
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void AttackAssistantFunction();
 
+	//Updates the Mag each time gun fires also calls the OnUpdate Mag
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void UpdateMag();
 
-	UFUNCTION(BlueprintCallable, Category = "GunSystem")
-	virtual void SwitchMode();
+	
 	
 
 	
 
-	
+	//Calls when reload finished. updates necessary variables and call OnReload delegate
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void OnReloadAmmoUpdate();
 
+	//call to update the ammo storage when more ammo collected from other ammo sources also exec UpdateCurrentStorage delegate
 	UFUNCTION(BlueprintCallable, Category = "GunSystem")
 	virtual void SetAmmoStorage(int32 Amount);
 
+	//called by TriggerReleased
 	UFUNCTION()
 	virtual void TriggerReleaseFunction();
 
-	void BrustFireFunction();
+	//Calls to fire when the Gun is in BurstMode
+	void BurstFireFunction();
 
+	//Calls to fire when the Gun is in SingleMode
 	void SingleFireFunction();
 
+	//Calls to Fire
 	void Fire();
 
+	//Call to get the ammount of ammo used up. Besically max ammo - used ammo in the storage
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	void GetUsedAmmoAmountInStorage(int32& ReturnValue);
 	

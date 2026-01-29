@@ -19,6 +19,9 @@ class ADVANCEAI_API AGCharacter : public ACharacter, public IGamePlayTagInterFac
 //variables
 public:
 	AGCharacter();
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UAnimInstance* AnimInstance;
 
 	protected:
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
@@ -30,10 +33,11 @@ public:
 	//Primary Weapon ref
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	AGBaseGun* Weapon;
-protected:
+	
 	//Character AnimInstance of SkeletalMesh
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UAnimInstance* AnimInstance;
+
+protected:
+	
 	
 	//Used by ABP_CharacterRifle to Set the StandeMode of Character. Crouching or Running Position
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

@@ -5,6 +5,7 @@
 
 #include <string>
 
+#include "AIController.h"
 #include "AdvanceAI/Public/InterFaces/GCharacterInterface.h"
 #include "AdvanceAI/Public/BlueprintFunctionLibrary/GunBlueprintFunctionLibrary.h"
 #include "AdvanceAI/Public/Systems/AttackSystem/AttackSystem.h"
@@ -68,7 +69,7 @@ void UGGunSystem::TriggerReleased()
 	
 }
 
-void UGGunSystem::SwitchFiringModleCycle()
+void UGGunSystem::SwitchFiringModeCycle()
 {
 	if (OwnerCharacter->Implements<UGamePlayTagInterFaces>())
 	{
@@ -128,7 +129,7 @@ void UGGunSystem::BeginPlay()
 
 void UGGunSystem::ResetAttack()
 {
-	bDoOnceFlag = false;
+	bHasFiredThisTrigger = false;
 	BrustFireCounter = 0;
 	
 }
@@ -142,7 +143,7 @@ void UGGunSystem::SwitchOnFiringMode(const FGameplayTag& Tag)
 	}
 	else if (Tag == FiringModeBrust)
 	{
-		BrustFireFunction();
+		BurstFireFunction();
 	}
 	else if (Tag == FiringModeSingle)
 	{
@@ -185,7 +186,7 @@ void UGGunSystem::SwitchSingleMode()
 	IGamePlayTagInterFaces::Execute_AddTag(OwnerCharacter,FiringModeSingle);
 }
 
-void UGGunSystem::SwitchBrustMode()
+void UGGunSystem::SwitchBurstMode()
 {
 	UGunBlueprintFunctionLibrary::DeleteTagBatch(OwnerCharacter, FiringModeTag);
 	IGamePlayTagInterFaces::Execute_AddTag(OwnerCharacter,FiringModeBrust);
@@ -248,9 +249,9 @@ void UGGunSystem::AttackAssistantFunction()
 		ProjectileInfo.DestroyedEmitterScale = GunAsset->BulletSpawnData.DestroyedEmitterScale;
 		ProjectileInfo.DamageInfo.DamageCauser = OwnerCharacter;
 
-		FRotator BulletRotatoion;
+		FRotator BulletRotation;
 		
-		UGunBlueprintFunctionLibrary::CameraAim(AsCharacter, TraceLength, ProjectileMuzzleName, ProjectileInfo.TraceEnd, ProjectileInfo.SpawnStart, ProjectileInfo.TraceStart,BulletRotatoion );
+		UGunBlueprintFunctionLibrary::CameraAim(AsCharacter, TraceLength, ProjectileMuzzleName, ProjectileInfo.TraceEnd, ProjectileInfo.SpawnStart, ProjectileInfo.TraceStart,BulletRotation );
 		if (IsCharacterAI && OwnerCharacter)
 		{
 			ProjectileInfo.TraceStart = OwnerCharacter->GetActorLocation();
@@ -276,25 +277,20 @@ void UGGunSystem::UpdateMag()
 
 void UGGunSystem::SwitchMode()
 {
-	if (SwitchCounter != MaxSwitchCounter)
-	{
-		SwitchCounter++;
-	}
-	else
-	{
-		SwitchCounter = 0;
-	}
 	
-	switch (SwitchCounter)
+	switch (FiringMode)
 	{
-	case 0:
+	case EFiringMode::EFM_Single:
+		FiringMode = EFiringMode::EFM_Auto;
 		IGamePlayTagInterFaces::Execute_AddTag(OwnerCharacter,FiringModeAuto);
 		break;
-	case 1:
+	case EFiringMode::EFM_Auto:
+		FiringMode = EFiringMode::EFM_Burst;
 		IGamePlayTagInterFaces::Execute_AddTag(OwnerCharacter,FiringModeBrust);
 		break;
 
-	case 2:
+	case EFiringMode::EFM_Burst:
+		FiringMode = EFiringMode::EFM_Single;
 		IGamePlayTagInterFaces::Execute_AddTag(OwnerCharacter,FiringModeSingle);
 		break;
 	}
@@ -306,10 +302,25 @@ void UGGunSystem::SwitchMode()
 void UGGunSystem::OnReloadAmmoUpdate()
 {
 	UsedBullets = MagCapacity - AmmoInMag;
+	
 
-	CurrentStorage = FMath::Clamp(CurrentStorage-UsedBullets, 0, MaxAmmoStorage);
+	
+	
+	
+	if (CurrentStorage > MagCapacity)
+	{
+		CurrentStorage = FMath::Clamp(CurrentStorage-UsedBullets, 0, MaxAmmoStorage);
+		AmmoInMag = FMath::Clamp(MagCapacity, 0, MagCapacity);
+	}
+	else
+	{
+		AmmoInMag = FMath::Clamp(CurrentStorage + AmmoInMag, 0, MagCapacity);
+		CurrentStorage = FMath::Clamp(CurrentStorage-UsedBullets, 0, MaxAmmoStorage);
+	}
+	
 
-	AmmoInMag = FMath::Clamp(MagCapacity, 0, MagCapacity);
+
+	
 
 	OnReloadFinished.Broadcast(AmmoInMag, CurrentStorage);
 }
@@ -325,6 +336,8 @@ void UGGunSystem::TriggerReleaseFunction()
 {
 
 	ResetAttack();
+	AAIController;
+	
 	GetWorld()->GetTimerManager().ClearTimer(AttackTimerHandle);
 
 	
@@ -346,7 +359,7 @@ void UGGunSystem::TriggerReleaseFunction()
 	
 }
 
-void UGGunSystem::BrustFireFunction()
+void UGGunSystem::BurstFireFunction()
 {
 	if (BrustFireCounter < BrustCount || BrustFireCounter == BrustCount)
 	{
@@ -358,9 +371,9 @@ void UGGunSystem::BrustFireFunction()
 
 void UGGunSystem::SingleFireFunction()
 {
-	if (bDoOnceFlag == false)
+	if (bHasFiredThisTrigger == false)
 	{
-		bDoOnceFlag = true;
+		bHasFiredThisTrigger = true;
 		Fire();
 		
 		

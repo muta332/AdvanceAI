@@ -201,7 +201,7 @@ void ABasePlayerCharacter::SwitchGunMode_Implementation()
 	Super::SwitchGunMode_Implementation();
 	if (Weapon && Weapon->GunSystem)
 	{
-		Weapon->GunSystem->SwitchFiringModleCycle();
+		Weapon->GunSystem->SwitchFiringModeCycle();
 	}
 }
 
