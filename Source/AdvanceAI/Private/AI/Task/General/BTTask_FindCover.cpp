@@ -41,14 +41,22 @@ EBTNodeResult::Type UBTTask_FindCover::ExecuteTask(UBehaviorTreeComponent& Owner
 	
 	IGCharacterInterface::Execute_SetSpeed(Pawn, Speed);
 	
+	UEnvQueryInstanceBlueprintWrapper* FindCover = UEnvQueryManager::RunEQSQuery(this, FindCoverEnvQuery,& OwnerComp,EEnvQueryRunMode::RandomBest25Pct, nullptr);	
+	
+	FindCoverMemory->QueryID = FindCover->GetQueryInstance()->QueryID;
+	//FEnvQueryRequest FindCoverEQSRequest(FindCoverEnvQuery, this);
+	
+	
+	
+	FindCoverMemory->EQSFindCover = FindCover;
+	
+	  FindCover->GetOnQueryFinishedEvent().AddDynamic(this, &UBTTask_FindCover::OnFindCoverEQSCompleted);
 		
-	FEnvQueryRequest FindCoverEQSRequest(FindCoverEnvQuery, this);
+	//int32 QueryID = FindCoverEQSRequest.Execute(EEnvQueryRunMode::RandomBest25Pct, this, &UBTTask_FindCover::OnFindCoverEQSCompleted);
 		
-	int32 QueryID = FindCoverEQSRequest.Execute(EEnvQueryRunMode::RandomBest25Pct, this, &UBTTask_FindCover::OnFindCoverEQSCompleted);
+	//FindCoverMemory->QueryID = QueryID;
 		
-	FindCoverMemory->QueryID = QueryID;
-		
-	NodeMemoryContainer.Add(QueryID, NodeMemory);
+	
 	
 	
 	
@@ -58,23 +66,44 @@ EBTNodeResult::Type UBTTask_FindCover::ExecuteTask(UBehaviorTreeComponent& Owner
 	
 }
 
-void UBTTask_FindCover::OnFindCoverEQSCompleted(TSharedPtr<FEnvQueryResult> Result)
+void UBTTask_FindCover::OnFindCoverEQSCompleted(UEnvQueryInstanceBlueprintWrapper* QueryInstance, EEnvQueryStatus::Type QueryStatus)
 {
 	
 	
-	uint8** NodeMemory = NodeMemoryContainer.Find(Result->QueryID);
-	if (NodeMemory && *NodeMemory)
+	UBehaviorTreeComponent* BTComp = nullptr;
+	
+	uint8* NodeMemory;
+	if (QueryInstance)
 	{
-		FBTFindCover* FindCoverMemory  = reinterpret_cast<FBTFindCover*>(*NodeMemory);
+		BTComp = Cast<UBehaviorTreeComponent>(QueryInstance->GetQueryInstance()->Owner);
+	}
+	if (!BTComp) return;
+	 NodeMemory = BTComp->GetNodeMemory(this, BTComp->FindInstanceContainingNode(this));
+	if (NodeMemory)
+	{
+		FBTFindCover* FindCoverMemory  = reinterpret_cast<FBTFindCover*>(NodeMemory);
 		
 		if (FindCoverMemory)
 		{
-			if (Result->IsSuccessful())
+			if (QueryStatus == EEnvQueryStatus::Success)
 			{
-				FindCoverMemory->AIC->MoveToLocation(Result->GetItemAsLocation(0), AcceptanceRadius);
+				TArray<FVector> Locations;
+				QueryInstance->GetQueryResultsAsLocations(Locations);
+				EPathFollowingRequestResult::Type Result = FindCoverMemory->AIC->MoveToLocation(Locations[0], AcceptanceRadius);
+				if (Result == EPathFollowingResult::Success)
+				{
+					PRINTONE("FindCover EQS Success")
+				}
+				else
+				{
+					PRINTONE("FindCover EQS FAILED")
+				}
+				
+				
+				
 				
 			}
-			else if (!Result->IsSuccessful())
+			else if (QueryStatus == EEnvQueryStatus::Failed || QueryStatus == EEnvQueryStatus::Aborted)
 			{
 				PRINTONE("FindCover EQS Failed")
 				FinishLatentTask(*FindCoverMemory->BTComp, EBTNodeResult::Failed);
@@ -141,7 +170,10 @@ void UBTTask_FindCover::UnbindAllDelegate(uint8* NodeMemory)
 			if (QueryManager)
 			{
 				QueryManager->AbortQuery(FindCoverMemory->QueryID);
-				NodeMemoryContainer.Remove(FindCoverMemory->QueryID);
+				
+				FindCoverMemory->EQSFindCover->GetOnQueryFinishedEvent().RemoveDynamic(this, & UBTTask_FindCover::OnFindCoverEQSCompleted);
+				
+				//NodeMemoryContainer.Remove(FindCoverMemory->QueryID);
 			}
 			FindCoverMemory->QueryID = INDEX_NONE;
 		}

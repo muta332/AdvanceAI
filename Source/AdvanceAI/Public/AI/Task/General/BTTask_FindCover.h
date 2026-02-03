@@ -14,6 +14,7 @@
 class UEnvQuery;
 class AGCharacter;
 class UEnvQueryInstanceBlueprintWrapper;
+
 struct FBTFindCover
 {
 	UBehaviorTreeComponent* BTComp;
@@ -27,6 +28,12 @@ struct FBTFindCover
 	FDelegateHandle PFCDelegateHandle;
 	
 	FDelegateHandle CoverDelegateHandle;
+	
+	FDelegateHandle EQSDelegateHandle;
+	
+	UEnvQueryInstanceBlueprintWrapper* EQSFindCover;
+	
+	
 	
 	int32 QueryID;
 };
@@ -51,11 +58,11 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true))
 	UEnvQuery* FindCoverEnvQuery;
 	
+	UFUNCTION()
+	void OnFindCoverEQSCompleted(UEnvQueryInstanceBlueprintWrapper* QueryInstance, EEnvQueryStatus::Type QueryStatus);
 	
-	void OnFindCoverEQSCompleted(TSharedPtr<FEnvQueryResult> Result);
 	
 	
-	static TMap<int32, uint8*> NodeMemoryContainer;
 	
 	void AIMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result, UBehaviorTreeComponent* OwnerComp);
 	

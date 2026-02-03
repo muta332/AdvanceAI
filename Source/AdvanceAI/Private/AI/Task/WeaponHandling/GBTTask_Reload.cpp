@@ -9,91 +9,171 @@
 #include "AdvanceAI/Public/InterFaces/GCharacterInterface.h"
 #include "Player/GCharacter.h"
 
-void UGBTTask_Reload::AbortFunctionIfFailedToReload()
-{
-	GetWorld()->GetTimerManager().SetTimer(AbortFunctionTimerHandle,  [this]()
-	{
-		if (bFunctionRunning)
-		{
-			FinishLatentTask(*OwnerComponent, EBTNodeResult::Failed);
-			bFunctionRunning = false;
-		}
-	},AbortTimer, true );
-}
 
-void UGBTTask_Reload::DoReloadTask(AGCharacter* AI)
+
+
+
+
+
+
+EBTNodeResult::Type UGBTTask_Reload::DoReloadTask(AGCharacter* AIPawn, AActor* WeaponActor,
+                                                  UBehaviorTreeComponent* BTComp)
 {
-	if (GunSystem)
+	
+	
+	if (AIPawn && WeaponActor)
 	{
-		GunSystem->TriggerReleased();
-			
-		GunSystem->Reloading();
-		
-		
-			
-		AbortFunctionIfFailedToReload();
-			
-		Character = IGCharacterInterface::Execute_GetCharacter(AI);
-			
-		if (Character)
+		UGGunSystem* GunSystem = WeaponActor->FindComponentByClass<UGGunSystem>();
+		if (GunSystem)
 		{
-			Character->AnimInstance->OnMontageEnded.AddDynamic(this, &UGBTTask_Reload::MontageEnded);
+			GunSystem->TriggerReleased();
+			
+			if (GunSystem->CurrentStorage > 0)
+			{
+				GunSystem->Reloading();
+				
+				
+			}
+			else if (GunSystem->CurrentStorage == 0 || GunSystem->CurrentStorage < 0)
+			{
+				IGamePlayTagInterFaces::Execute_AddTag(AIPawn, FGameplayTag::RequestGameplayTag("Gun.StorageEmty"));
+				
+				return EBTNodeResult::Failed;
+			}
+		}
+		else
+		{
+			return EBTNodeResult::Failed;
 		}
 	}
+	
+	return EBTNodeResult::InProgress;
+}
+
+void UGBTTask_Reload::InitializeTaskMemory(UBehaviorTreeComponent& OwnerComp, FBTReload* TaskMemory, AGBaseGun* WeaponActor, AGCharacter* AI)
+{
+	TaskMemory->BTComp = &OwnerComp;
+	
+	TaskMemory->NodeTask = this;
+	
+	TaskMemory->Pawn = AI;
+	
+	TaskMemory->AIC = OwnerComp.GetAIOwner();
+	
+	TaskMemory->GunSystem = WeaponActor->FindComponentByClass<UGGunSystem>();
 }
 
 EBTNodeResult::Type UGBTTask_Reload::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	if (!(OwnerComp.GetAIOwner() && OwnerComp.GetAIOwner()->GetPawn())) return EBTNodeResult::Failed;
-	bFunctionRunning = true;
 	
 	
-	AGBaseGun* WeaponActor;
 	
-	OwnerComponent = &OwnerComp;
+	
+	FBTReload* TaskMemory = reinterpret_cast<FBTReload*>(NodeMemory); 
+	
+	AGBaseGun* WeaponActor = nullptr;
 	
 	AGCharacter* AI= Cast<AGCharacter>(OwnerComp.GetAIOwner()->GetPawn());
 	
 	IGCharacterInterface::Execute_GetWeapon(AI, WeaponActor);
 	
-	if (WeaponActor)
+	EBTNodeResult::Type NodeResult = EBTNodeResult::Failed;
+	
+	if (TaskMemory && WeaponActor && AI)
 	{
-		GunSystem = WeaponActor->FindComponentByClass<UGGunSystem>();
+		InitializeTaskMemory(OwnerComp, TaskMemory, WeaponActor, AI);
+
+	NodeResult = DoReloadTask(AI, WeaponActor, &OwnerComp);
+ 	
+ 	
+	}
 		
-		DoReloadTask(AI);
 		
-		return EBTNodeResult::InProgress;
+	if (TaskMemory &&!TaskMemory->Proxy && NodeResult == EBTNodeResult::InProgress)
+	{
+		UProxyObject* Proxy = NewObject<UProxyObject>(&OwnerComp);
+		
+		TaskMemory->Proxy = Proxy;
+		
+		TaskMemory->Proxy->ReloadDataTask = *TaskMemory;
+		
+		
+		Proxy->BindFunctions();
+		
+		
 	}
 	
+	return NodeResult;
 	
 	
-	return EBTNodeResult::InProgress;
+	
+
+	
+
+	
+	
+	
+	
+	
 }
 
-void UGBTTask_Reload::MontageEnded(UAnimMontage* Montage, bool bInterrupted)
+
+
+
+void UGBTTask_Reload::CleanUpReloadTask(uint8* NodeMemory)
 {
-	bFunctionRunning = false;
 	
-	Character->AnimInstance->OnMontageEnded.RemoveDynamic(this, &UGBTTask_Reload::MontageEnded);
 	
-	if (!bInterrupted)
+	FBTReload* ReloadData = reinterpret_cast<FBTReload*>(NodeMemory);
+	
+	if (ReloadData && ReloadData->Pawn && ReloadData->Pawn->AnimInstance && ReloadData->Proxy)
 	{
-        FinishLatentTask(*OwnerComponent, EBTNodeResult::Succeeded);
+		ReloadData->Pawn->AnimInstance->OnMontageEnded.RemoveDynamic(ReloadData->Proxy, &UProxyObject::MontageEnded);
 	}
-	else
-	{
-		 FinishLatentTask(*OwnerComponent, EBTNodeResult::Failed);
-		
-	}
-	
 	
 	
 }
 
 EBTNodeResult::Type UGBTTask_Reload::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	bFunctionRunning = false;
-    GetWorld()->GetTimerManager().ClearTimer(AbortFunctionTimerHandle);
+     CleanUpReloadTask(NodeMemory);
 	
-	return EBTNodeResult::Succeeded;
+	return EBTNodeResult::Aborted;
+}
+
+void UGBTTask_Reload::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory,
+                                     EBTNodeResult::Type TaskResult)
+{
+	CleanUpReloadTask(NodeMemory);
+	
+	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
+}
+
+void UProxyObject::BindFunctions()
+{
+	if (ReloadDataTask.Pawn && ReloadDataTask.Pawn->AnimInstance)
+	{
+		ReloadDataTask.Pawn->AnimInstance->OnMontageEnded.AddDynamic(this, &UProxyObject::MontageEnded);
+	}
+	
+}
+
+void UProxyObject::MontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	
+	
+	if (!(ReloadDataTask.NodeTask && ReloadDataTask.BTComp && ReloadDataTask.Pawn)) return;
+	
+	
+	
+	if (!bInterrupted)
+	{
+		ReloadDataTask.NodeTask->FinishLatentTask(*ReloadDataTask.BTComp, EBTNodeResult::Succeeded);
+	}
+	else
+	{   
+		ReloadDataTask.NodeTask->FinishLatentTask(*ReloadDataTask.BTComp, EBTNodeResult::Failed);
+		
+	}
 }
