@@ -14,28 +14,39 @@
 class UEnvQuery;
 class AGCharacter;
 class UEnvQueryInstanceBlueprintWrapper;
+class UProxy;
+struct FBTFindCover;
 
-struct FBTFindCover
+USTRUCT()
+struct FBTFindCover 
 {
-	UBehaviorTreeComponent* BTComp;
+
+  GENERATED_BODY()
+	UPROPERTY()
+ 
+	TObjectPtr<UBehaviorTreeComponent> BTComp = nullptr;
+	
+	UPROPERTY()
+	TObjectPtr<AAIController> AIC = nullptr;
+	
+	UPROPERTY()
+	TObjectPtr<AGCharacter> Pawn = nullptr;
+	
+	UPROPERTY()
+	TObjectPtr<UEnvQueryInstanceBlueprintWrapper> EQSFindCover = nullptr;
+	
+	UPROPERTY()
+	TObjectPtr<UBTTaskNode> MainNode = nullptr;
+	
+	UPROPERTY()
+	TWeakObjectPtr<UProxy> Proxy = nullptr;
 	
 	
-	AAIController* AIC;
+	TWeakObjectPtr<FBTFindCover>* FindCoverMemory;
+	
+	float AcceptanceRadius;
 	
 	
-	AGCharacter* Pawn;
-	
-	FDelegateHandle PFCDelegateHandle;
-	
-	FDelegateHandle CoverDelegateHandle;
-	
-	FDelegateHandle EQSDelegateHandle;
-	
-	UEnvQueryInstanceBlueprintWrapper* EQSFindCover;
-	
-	
-	
-	int32 QueryID;
 };
 
 UCLASS()
@@ -46,7 +57,9 @@ public:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = true))
 	float Speed = 800.f;
-protected: 
+protected:
+	void InitializeFindCoverMemory(UBehaviorTreeComponent& OwnerComp, FBTFindCover* FindCoverMemory, AAIController* AIC,
+	                               AGCharacter* Pawn, UEnvQueryInstanceBlueprintWrapper* FindCover);
 	EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
 	//UPROPERTY()
@@ -58,18 +71,36 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true))
 	UEnvQuery* FindCoverEnvQuery;
 	
-	UFUNCTION()
-	void OnFindCoverEQSCompleted(UEnvQueryInstanceBlueprintWrapper* QueryInstance, EEnvQueryStatus::Type QueryStatus);
-	
-	
-	
-	
-	void AIMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result, UBehaviorTreeComponent* OwnerComp);
 	
 	uint16 GetInstanceMemorySize() const override;
 	
 	EBTNodeResult::Type AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
-	void UnbindAllDelegate(uint8* NodeMemory);
+	
+	void UnbindFunctions(uint8* NodeMemory);
 
-	void OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult);
+	void OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult) override;
+	
+	void BindFunctions(uint8* NodeMemory);
+};
+
+UCLASS()
+class UProxy : public UObject
+{
+	GENERATED_BODY()
+public : 
+	
+    UPROPERTY()
+	FBTFindCover FindCoverMemory;
+	
+	
+	
+
+	
+	FDelegateHandle PathFollowingHandle;
+	
+	UFUNCTION()
+	void AIMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::Type Result);
+	
+	UFUNCTION()
+	void OnFindCoverEQSCompleted(UEnvQueryInstanceBlueprintWrapper* QueryInstance, EEnvQueryStatus::Type QueryStatus);
 };
